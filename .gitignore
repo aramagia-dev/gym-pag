@@ -36,6 +36,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local code intelligence index
+/.codegraph/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
