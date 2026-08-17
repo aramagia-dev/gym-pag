@@ -9,9 +9,9 @@ interface DarkGradientBgProps {
 export function DarkGradientBg({ children, className }: DarkGradientBgProps) {
   return (
     <div
-      className={cn("relative min-h-screen w-full overflow-hidden bg-black", className)}
+      className={cn("relative min-h-screen w-full bg-black", className)}
     >
-      <div className="absolute inset-0">
+      <div className="pointer-events-none fixed inset-0" aria-hidden="true">
         <div
           className="absolute inset-0 opacity-100"
           style={{
@@ -63,20 +63,25 @@ export function DarkGradientBg({ children, className }: DarkGradientBgProps) {
       </div>
 
       <div
-        className="absolute inset-0 bg-repeat opacity-5"
+        className="pointer-events-none fixed inset-0 bg-repeat opacity-5"
+        aria-hidden="true"
         style={{
           backgroundImage: 'url("https://framerusercontent.com/images/6mcf62RlDfRfU61Yg5vb2pefpi4.png")',
           backgroundSize: "149.76px",
         }}
       />
       <div
-        className="absolute inset-0 opacity-20"
+        className="pointer-events-none fixed inset-0 opacity-20"
+        aria-hidden="true"
         style={{
           backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.5) 1px, transparent 0)",
           backgroundSize: "20px 20px",
         }}
       />
-      <div className="absolute inset-0 bg-gradient-radial from-slate-800/20 via-transparent to-transparent" />
+      <div
+        className="pointer-events-none fixed inset-0 bg-gradient-radial from-slate-800/20 via-transparent to-transparent"
+        aria-hidden="true"
+      />
       <div className="relative z-10">{children}</div>
     </div>
   );

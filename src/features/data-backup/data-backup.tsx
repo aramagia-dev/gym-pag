@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { dataBackupService } from "@/src/application/composition";
 
 function errorMessage(error: unknown): string {
@@ -48,6 +49,7 @@ export default function DataBackup() {
         <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div><p className="mb-2 text-sm font-semibold uppercase tracking-[0.22em] text-cyan-400">Gym / Datos</p><h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Respaldo de datos</h1><p className="mt-2 max-w-xl text-sm text-slate-400">Proteja sus ejercicios, rutinas y entrenamientos guardados en este dispositivo.</p></div>
           <nav className="flex flex-wrap gap-2 text-sm" aria-label="Navegación principal">
+            <Link className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/">Inicio</Link>
             <a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/exercises">Ejercicios</a>
             <a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/routines">Rutinas</a>
             <a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/history">Historial</a>
