@@ -82,6 +82,12 @@ export default function WorkoutHistory() {
             >
               Progreso
             </a>
+            <a
+              className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400"
+              href="/data"
+            >
+              Datos
+            </a>
           </nav>
         </header>
         {loading && (
