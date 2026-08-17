@@ -21,6 +21,7 @@ class InMemoryWorkoutRepository implements WorkoutRepository {
   }
   updateSession(session: WorkoutSession) { this.sessions = this.sessions.map((item) => item.id === session.id ? session : item); return Promise.resolve(); }
   deleteSessionById(id: string) { this.sessions = this.sessions.filter((item) => item.id !== id); return Promise.resolve(); }
+  deleteSessionsWithSets(ids: string[]) { this.sessions = this.sessions.filter((item) => !ids.includes(item.id)); this.sets = this.sets.filter((item) => !ids.includes(item.sessionId)); return Promise.resolve(); }
   findSetById(id: string) { return Promise.resolve(this.sets.find((item) => item.id === id) ?? null); }
   findSetsBySessionId(sessionId: string) { return Promise.resolve(this.sets.filter((item) => item.sessionId === sessionId)); }
   createSet(set: WorkoutSet) { this.sets.push(set); return Promise.resolve(); }

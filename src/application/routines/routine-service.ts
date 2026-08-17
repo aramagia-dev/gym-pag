@@ -6,6 +6,7 @@ import type {
 } from "@/src/domain/models/workout";
 import type { ExerciseRepository } from "@/src/domain/repositories/exercise-repository";
 import type { RoutineRepository } from "@/src/domain/repositories/routine-repository";
+import type { WorkoutRepository } from "@/src/domain/repositories/workout-repository";
 
 export interface RoutineExerciseInput {
   exerciseId: EntityId;
@@ -34,6 +35,7 @@ export class RoutineService {
     private readonly exerciseRepository: ExerciseRepository,
     private readonly routineIdGenerator: RoutineIdGenerator = defaultRoutineIdGenerator,
     private readonly templateExerciseIdGenerator: RoutineIdGenerator = defaultTemplateExerciseIdGenerator,
+    private readonly workoutRepository?: WorkoutRepository,
   ) {}
 
   list(): Promise<RoutineTemplate[]> {
@@ -42,6 +44,23 @@ export class RoutineService {
 
   get(id: EntityId): Promise<RoutineTemplate | null> {
     return this.routineRepository.findById(id);
+  }
+
+  async delete(id: EntityId): Promise<void> {
+    if (!(await this.routineRepository.findById(id))) {
+      throw new Error("La rutina no existe.");
+    }
+
+    if (!this.workoutRepository) {
+      throw new Error("No se puede verificar el historial de entrenamientos.");
+    }
+
+    const sessions = await this.workoutRepository.findAllSessions();
+    if (sessions.some((session) => session.templateId === id)) {
+      throw new Error("No se puede eliminar una rutina utilizada en el historial de entrenamientos.");
+    }
+
+    await this.routineRepository.deleteById(id);
   }
 
   async create(input: RoutineInput): Promise<RoutineTemplate> {

@@ -11,6 +11,7 @@ export interface WorkoutRepository {
   createSessionWithSets(session: WorkoutSession, sets: WorkoutSet[]): Promise<void>;
   updateSession(session: WorkoutSession): Promise<void>;
   deleteSessionById(id: EntityId): Promise<void>;
+  deleteSessionsWithSets(ids: EntityId[]): Promise<void>;
 
   findSetById(id: EntityId): Promise<WorkoutSet | null>;
   findSetsBySessionId(sessionId: EntityId): Promise<WorkoutSet[]>;

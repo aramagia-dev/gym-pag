@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { RoutineService, type RoutineInput } from "@/src/application/routines/routine-service";
-import type { Exercise, RoutineTemplate } from "@/src/domain/models/workout";
+import type { Exercise, RoutineTemplate, WorkoutSession } from "@/src/domain/models/workout";
 import type { ExerciseRepository } from "@/src/domain/repositories/exercise-repository";
 import type { RoutineRepository } from "@/src/domain/repositories/routine-repository";
+import type { WorkoutRepository } from "@/src/domain/repositories/workout-repository";
 
 class InMemoryExerciseRepository implements ExerciseRepository {
   constructor(private readonly exercises: Exercise[]) {}
@@ -16,6 +17,7 @@ class InMemoryExerciseRepository implements ExerciseRepository {
 
 class InMemoryRoutineRepository implements RoutineRepository {
   readonly routines: RoutineTemplate[] = [];
+  readonly deletedIds: string[] = [];
   findById(id: string) { return Promise.resolve(this.routines.find((routine) => routine.id === id) ?? null); }
   findAll() { return Promise.resolve(this.routines); }
   create(routine: RoutineTemplate) { this.routines.push(routine); return Promise.resolve(); }
@@ -24,7 +26,24 @@ class InMemoryRoutineRepository implements RoutineRepository {
     if (index >= 0) this.routines[index] = routine;
     return Promise.resolve();
   }
-  deleteById() { return Promise.resolve(); }
+  deleteById(id: string) { this.deletedIds.push(id); return Promise.resolve(); }
+}
+
+class InMemoryWorkoutRepository implements WorkoutRepository {
+  constructor(readonly sessions: WorkoutSession[] = []) {}
+  findSessionById(id: string) { return Promise.resolve(this.sessions.find((session) => session.id === id) ?? null); }
+  findAllSessions() { return Promise.resolve(this.sessions); }
+  createSession() { return Promise.resolve(); }
+  createSessionWithSets() { return Promise.resolve(); }
+  updateSession() { return Promise.resolve(); }
+  deleteSessionById() { return Promise.resolve(); }
+  deleteSessionsWithSets() { return Promise.resolve(); }
+  findSetById() { return Promise.resolve(null); }
+  findSetsBySessionId() { return Promise.resolve([]); }
+  createSet() { return Promise.resolve(); }
+  updateSet() { return Promise.resolve(); }
+  deleteSetById() { return Promise.resolve(); }
+  findPreviousCompletedSets() { return Promise.resolve([]); }
 }
 
 const exercise: Exercise = { id: "exercise-1", name: "Sentadilla", muscleGroup: "quadriceps", category: "squat" };
@@ -33,7 +52,7 @@ const input: RoutineInput = {
   exercises: [{ exerciseId: "exercise-1", targetSets: 4, targetReps: 8, restSeconds: 120 }],
 };
 
-function createService(routineRepository = new InMemoryRoutineRepository(), exercises = [exercise]) {
+function createService(routineRepository = new InMemoryRoutineRepository(), exercises = [exercise], workoutRepository = new InMemoryWorkoutRepository()) {
   let index = 0;
   return {
     routineRepository,
@@ -42,6 +61,7 @@ function createService(routineRepository = new InMemoryRoutineRepository(), exer
       new InMemoryExerciseRepository(exercises),
       () => "routine-1",
       () => `template-${++index}`,
+      workoutRepository,
     ),
   };
 }
@@ -115,5 +135,34 @@ describe("RoutineService", () => {
 
     expect(updated.id).toBe(created.id);
     expect(updated.id).not.toBe("routine-2");
+  });
+
+  it("deletes an existing routine without workout history", async () => {
+    const repository = new InMemoryRoutineRepository();
+    const { service } = createService(repository);
+    const created = await service.create(input);
+
+    await service.delete(created.id);
+
+    expect(repository.deletedIds).toEqual([created.id]);
+  });
+
+  it("rejects deleting a missing routine", async () => {
+    const { service } = createService();
+
+    await expect(service.delete("missing")).rejects.toThrow("rutina no existe");
+  });
+
+  it("rejects deleting a routine used by active or finished history", async () => {
+    const repository = new InMemoryRoutineRepository();
+    const workoutRepository = new InMemoryWorkoutRepository([
+      { id: "active", templateId: "routine-1", startTime: "2026-08-16T10:00:00.000Z" },
+      { id: "finished", templateId: "routine-1", startTime: "2026-08-15T10:00:00.000Z", endTime: "2026-08-15T11:00:00.000Z" },
+    ]);
+    const { service } = createService(repository, [exercise], workoutRepository);
+    await service.create(input);
+
+    await expect(service.delete("routine-1")).rejects.toThrow("historial de entrenamientos");
+    expect(repository.deletedIds).toEqual([]);
   });
 });

@@ -33,7 +33,15 @@ export class WorkoutDexieRepository implements WorkoutRepository {
   }
 
   async deleteSessionById(id: EntityId): Promise<void> {
-    await this.db.workoutSessions.delete(id);
+    await this.deleteSessionsWithSets([id]);
+  }
+
+  async deleteSessionsWithSets(ids: EntityId[]): Promise<void> {
+    if (ids.length === 0) return;
+    await this.db.transaction("rw", this.db.workoutSessions, this.db.workoutSets, async () => {
+      await this.db.workoutSets.where("sessionId").anyOf(ids).delete();
+      await this.db.workoutSessions.bulkDelete(ids);
+    });
   }
 
   findSetById(id: EntityId): Promise<WorkoutSet | null> {

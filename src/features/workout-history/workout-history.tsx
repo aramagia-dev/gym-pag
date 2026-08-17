@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { workoutAnalyticsService } from "@/src/application/composition";
+import {
+  workoutAnalyticsService,
+  workoutHistoryService,
+} from "@/src/application/composition";
 import type { WorkoutHistoryEntry } from "@/src/application/workouts/workout-analytics-service";
 
 const dateFormatter = new Intl.DateTimeFormat("es-ES", {
@@ -18,6 +21,7 @@ export default function WorkoutHistory() {
   const [entries, setEntries] = useState<WorkoutHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     workoutAnalyticsService
@@ -35,6 +39,53 @@ export default function WorkoutHistory() {
       active = false;
     };
   }, []);
+
+  async function refreshHistory() {
+    setEntries(await workoutAnalyticsService.getHistory());
+  }
+
+  async function deleteAll() {
+    if (!window.confirm("¿Borrar todo el historial? Se eliminarán las sesiones completadas y sus series. La sesión en curso se conservará.")) return;
+    setDeleting("all");
+    setError(null);
+    try {
+      await workoutHistoryService.deleteAllCompletedSessions();
+      await refreshHistory();
+    } catch (reason: unknown) {
+      setError(errorMessage(reason));
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  async function deleteLastMonth() {
+    if (!window.confirm("¿Borrar las sesiones completadas del último mes? Esta acción también elimina sus series y no afecta la sesión en curso.")) return;
+    setDeleting("month");
+    setError(null);
+    try {
+      await workoutHistoryService.deleteCompletedSessionsFromLastMonth();
+      await refreshHistory();
+    } catch (reason: unknown) {
+      setError(errorMessage(reason));
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  async function deleteEntry(entry: WorkoutHistoryEntry) {
+    if (entry.status !== "completed") return;
+    if (!window.confirm(`¿Borrar la sesión del ${dateFormatter.format(new Date(entry.session.startTime))}? También se eliminarán sus series.`)) return;
+    setDeleting(entry.session.id);
+    setError(null);
+    try {
+      await workoutHistoryService.deleteSessionById(entry.session.id);
+      await refreshHistory();
+    } catch (reason: unknown) {
+      setError(errorMessage(reason));
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   return (
     <main className="min-h-screen px-4 py-6 text-slate-100 sm:px-8 sm:py-10">
@@ -103,6 +154,34 @@ export default function WorkoutHistory() {
             {error}
           </p>
         )}
+        <section className="mb-6 rounded-2xl border border-rose-900/60 bg-slate-900/80 p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Gestionar historial</h2>
+              <p className="mt-1 max-w-2xl text-sm text-slate-400">
+                Estas acciones borran sesiones completadas y todas sus series. Una sesión en curso siempre se conserva.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:min-w-56">
+              <button
+                type="button"
+                onClick={() => void deleteAll()}
+                disabled={deleting !== null}
+                className="min-h-11 rounded-lg bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleting === "all" ? "Borrando..." : "Borrar todo el historial"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteLastMonth()}
+                disabled={deleting !== null}
+                className="min-h-11 rounded-lg border border-rose-800 px-4 py-2.5 text-sm font-semibold text-rose-200 hover:border-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleting === "month" ? "Borrando..." : "Borrar el último mes"}
+              </button>
+            </div>
+          </div>
+        </section>
         {!loading && !error && entries.length === 0 && (
           <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 p-8 text-center">
             <p className="font-medium">Todavía no hay sesiones</p>
@@ -146,14 +225,33 @@ export default function WorkoutHistory() {
                   </dd>
                 </div>
               </dl>
-              <a
-                href={`/workouts/${entry.session.id}`}
-                className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-700 px-4 text-sm font-semibold text-cyan-300 hover:border-cyan-400"
-              >
-                {entry.status === "completed"
-                  ? "Ver sesión"
-                  : "Continuar sesión"}
-              </a>
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <a
+                  href={`/workouts/${entry.session.id}`}
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-700 px-4 text-sm font-semibold text-cyan-300 hover:border-cyan-400"
+                >
+                  {entry.status === "completed" ? "Ver sesión" : "Continuar sesión"}
+                </a>
+                {entry.status === "completed" ? (
+                  <button
+                    type="button"
+                    onClick={() => void deleteEntry(entry)}
+                    disabled={deleting !== null}
+                    className="min-h-11 rounded-lg border border-rose-800 px-4 text-sm font-semibold text-rose-200 hover:border-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {deleting === entry.session.id ? "Borrando..." : "Borrar"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    title="Las sesiones en curso no se pueden borrar"
+                    className="min-h-11 cursor-not-allowed rounded-lg border border-slate-800 px-4 text-xs font-semibold text-slate-500"
+                  >
+                    No disponible: sesión en curso
+                  </button>
+                )}
+              </div>
             </article>
           ))}
         </div>

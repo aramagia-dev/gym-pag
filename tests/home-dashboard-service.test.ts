@@ -12,6 +12,7 @@ class MemoryWorkoutRepository implements WorkoutRepository {
   createSessionWithSets() { return Promise.resolve(); }
   updateSession() { return Promise.resolve(); }
   deleteSessionById() { return Promise.resolve(); }
+  deleteSessionsWithSets() { return Promise.resolve(); }
   findSetById(id: string) { return Promise.resolve(this.sets.find((set) => set.id === id) ?? null); }
   findSetsBySessionId(sessionId: string) { return Promise.resolve(this.sets.filter((set) => set.sessionId === sessionId)); }
   createSet() { return Promise.resolve(); }

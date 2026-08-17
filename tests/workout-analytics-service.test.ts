@@ -10,6 +10,7 @@ class MemoryWorkout implements WorkoutRepository {
   findSessionById(id: string) { return Promise.resolve(this.sessions.find((item) => item.id === id) ?? null); }
   findAllSessions() { return Promise.resolve(this.sessions); }
   createSession() { return Promise.resolve(); } updateSession() { return Promise.resolve(); } deleteSessionById() { return Promise.resolve(); }
+  deleteSessionsWithSets() { return Promise.resolve(); }
   createSessionWithSets() { return Promise.resolve(); }
   findSetById(id: string) { return Promise.resolve(this.sets.find((item) => item.id === id) ?? null); }
   findSetsBySessionId(id: string) { return Promise.resolve(this.sets.filter((item) => item.sessionId === id)); }

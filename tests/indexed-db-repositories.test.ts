@@ -146,6 +146,27 @@ describe("Dexie persistence repositories", () => {
     expect(await repository.findSetById(secondSet.id)).toEqual(secondSet);
   });
 
+  it("deletes sessions and all associated sets atomically", async () => {
+    const repository = new WorkoutDexieRepository(db);
+    const sessions: WorkoutSession[] = [
+      { id: "delete-one", startTime: "2026-08-10T08:00:00.000Z", endTime: "2026-08-10T09:00:00.000Z" },
+      { id: "keep", startTime: "2026-08-11T08:00:00.000Z", endTime: "2026-08-11T09:00:00.000Z" },
+    ];
+    const sets: WorkoutSet[] = sessions.map((session, index) => ({
+      id: `${session.id}-set`, sessionId: session.id, exerciseId: "exercise-1", setNumber: 1,
+      setType: "working", weight: index + 1, reps: 5, isCompleted: true,
+    }));
+    await db.workoutSessions.bulkPut(sessions);
+    await db.workoutSets.bulkPut(sets);
+
+    await repository.deleteSessionsWithSets(["delete-one"]);
+
+    await expect(repository.findSessionById("delete-one")).resolves.toBeNull();
+    await expect(repository.findSetsBySessionId("delete-one")).resolves.toEqual([]);
+    await expect(repository.findSessionById("keep")).resolves.toEqual(sessions[1]);
+    await expect(repository.findSetsBySessionId("keep")).resolves.toEqual([sets[1]]);
+  });
+
   it("excludes incomplete sets and orders completed sets by session time and set number", async () => {
     const repository = new WorkoutDexieRepository(db);
     const olderSession: WorkoutSession = {
