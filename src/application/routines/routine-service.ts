@@ -2,6 +2,7 @@ import type {
   DayOfWeek,
   EntityId,
   RoutineTemplate,
+  TemplateSet,
   TemplateExercise,
 } from "@/src/domain/models/workout";
 import type { ExerciseRepository } from "@/src/domain/repositories/exercise-repository";
@@ -10,8 +11,10 @@ import type { WorkoutRepository } from "@/src/domain/repositories/workout-reposi
 
 export interface RoutineExerciseInput {
   exerciseId: EntityId;
-  targetSets: number;
-  targetReps: number;
+  targetSets?: number;
+  targetReps?: number;
+  sets?: TemplateSet[];
+  startingWeightKg?: number;
   restSeconds?: number;
 }
 
@@ -86,11 +89,26 @@ export class RoutineService {
     if (input.exercises.length === 0) throw new Error("Seleccione al menos un ejercicio.");
 
     for (const selectedExercise of input.exercises) {
-      if (!Number.isInteger(selectedExercise.targetSets) || selectedExercise.targetSets <= 0) {
-        throw new Error("Las series objetivo deben ser mayores que cero.");
+      let sets: TemplateSet[];
+      if (selectedExercise.sets?.length) {
+        sets = selectedExercise.sets;
+      } else {
+        const targetSets = selectedExercise.targetSets;
+        const targetReps = selectedExercise.targetReps;
+        if (typeof targetSets !== "number" || !Number.isInteger(targetSets) || targetSets <= 0) {
+          throw new Error("Las series objetivo deben ser mayores que cero.");
+        }
+        if (typeof targetReps !== "number" || !Number.isInteger(targetReps) || targetReps <= 0) {
+          throw new Error("Las repeticiones objetivo deben ser mayores que cero.");
+        }
+        sets = Array.from({ length: targetSets }, () => ({ reps: targetReps }));
       }
-      if (!Number.isInteger(selectedExercise.targetReps) || selectedExercise.targetReps <= 0) {
+      if (sets.some((set) => !Number.isInteger(set.reps) || set.reps <= 0)) {
         throw new Error("Las repeticiones objetivo deben ser mayores que cero.");
+      }
+      if (selectedExercise.startingWeightKg !== undefined &&
+        (!Number.isFinite(selectedExercise.startingWeightKg) || selectedExercise.startingWeightKg < 0)) {
+        throw new Error("El peso inicial no puede ser negativo.");
       }
       if (selectedExercise.restSeconds !== undefined && (!Number.isInteger(selectedExercise.restSeconds) || selectedExercise.restSeconds < 0)) {
         throw new Error("El descanso no puede ser negativo.");
@@ -100,16 +118,23 @@ export class RoutineService {
       }
     }
 
-    const exercises: TemplateExercise[] = input.exercises.map((selectedExercise, order) => ({
+    const exercises: TemplateExercise[] = input.exercises.map((selectedExercise, order) => {
+      const sets = selectedExercise.sets?.length
+        ? selectedExercise.sets.map((set) => ({ reps: set.reps }))
+        : Array.from({ length: selectedExercise.targetSets! }, () => ({ reps: selectedExercise.targetReps! }));
+      return {
       id: this.templateExerciseIdGenerator(),
       exerciseId: selectedExercise.exerciseId,
       order,
-      targetSets: selectedExercise.targetSets,
-      targetReps: selectedExercise.targetReps,
+      targetSets: sets.length,
+      targetReps: sets[0].reps,
+      sets,
+      ...(selectedExercise.startingWeightKg === undefined ? {} : { startingWeightKg: selectedExercise.startingWeightKg }),
       ...(selectedExercise.restSeconds === undefined
         ? {}
         : { restSeconds: selectedExercise.restSeconds }),
-    }));
+      };
+    });
     return {
       id,
       name,

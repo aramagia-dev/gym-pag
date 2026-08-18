@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { formatRestCountdown, restMinutesToSeconds, restSecondsToMinutes } from "@/src/features/active-workout/rest-timer";
+import {
+  adjustRestExpiry,
+  formatRestCountdown,
+  remainingRestSeconds,
+  restMinutesToSeconds,
+  restSecondsToMinutes,
+} from "@/src/features/active-workout/rest-timer";
 
 describe("rest timer helpers", () => {
   it("converts routine rest between minutes and persisted seconds", () => {
@@ -17,5 +23,12 @@ describe("rest timer helpers", () => {
     expect(formatRestCountdown(90)).toBe("1:30");
     expect(formatRestCountdown(3600)).toBe("60:00");
     expect(formatRestCountdown(-1)).toBe("0:00");
+  });
+
+  it("calculates deterministic remaining time and clamps subtraction at zero", () => {
+    expect(remainingRestSeconds(10_000, 1_250)).toBe(9);
+    expect(remainingRestSeconds(1_000, 2_000)).toBe(0);
+    expect(adjustRestExpiry(10_000, 1_250, 15)).toBe(25_250);
+    expect(adjustRestExpiry(10_000, 1_250, -15)).toBeUndefined();
   });
 });

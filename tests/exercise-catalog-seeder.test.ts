@@ -101,6 +101,7 @@ describe("default exercise catalog seed", () => {
       name: "Press militar",
       muscleGroup: "shoulders",
       category: "push",
+      mode: "weighted",
       notes: "Evitar compensar con la zona lumbar.",
       imageUrl: "data:image/png;base64,abc123",
     });
@@ -112,6 +113,7 @@ describe("default exercise catalog seed", () => {
       name: "Press militar con barra",
       muscleGroup: "shoulders",
       category: "push",
+      mode: "weighted",
       notes: "Evitar compensar con la zona lumbar.",
       imageUrl: "data:image/png;base64,abc123",
     });

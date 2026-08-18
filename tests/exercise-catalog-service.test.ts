@@ -53,6 +53,7 @@ const benchPress: ExerciseInput = {
   name: "  Bench press  ",
   muscleGroup: "chest",
   category: "push",
+  mode: "weighted",
   notes: "Use a controlled eccentric.",
 };
 
@@ -128,6 +129,7 @@ describe("ExerciseCatalogService", () => {
       name: "Incline bench press",
       muscleGroup: "chest",
       category: "push",
+      mode: "weighted",
       notes: undefined,
     });
     expect(await repository.findById("exercise-1")).toEqual(updated);

@@ -9,10 +9,10 @@ const set: WorkoutSet = {
 
 describe("initialDraftValues", () => {
   it("uses the matching previous values for untouched routine defaults", () => {
-    expect(initialDraftValues(set, { weight: 40, reps: 8 }, 10)).toEqual({ weight: 40, reps: 8 });
+    expect(initialDraftValues(set, { weight: 40, reps: 8 }, 10)).toEqual({ weight: 40, reps: 8, setType: "working", notes: undefined });
   });
 
   it("preserves current values when the user already entered them", () => {
-    expect(initialDraftValues({ ...set, weight: 35, reps: 9 }, { weight: 40, reps: 8 }, 10)).toEqual({ weight: 35, reps: 9 });
+    expect(initialDraftValues({ ...set, weight: 35, reps: 9 }, { weight: 40, reps: 8 }, 10)).toEqual({ weight: 35, reps: 9, setType: "working", notes: undefined });
   });
 });

@@ -46,7 +46,7 @@ class InMemoryWorkoutRepository implements WorkoutRepository {
   findPreviousCompletedSets() { return Promise.resolve([]); }
 }
 
-const exercise: Exercise = { id: "exercise-1", name: "Sentadilla", muscleGroup: "quadriceps", category: "squat" };
+const exercise: Exercise = { id: "exercise-1", name: "Sentadilla", muscleGroup: "quadriceps", category: "squat", mode: "weighted" };
 const input: RoutineInput = {
   name: "  Piernas  ", daysOfWeek: ["monday", "thursday"], notes: "  Técnica  ",
   exercises: [{ exerciseId: "exercise-1", targetSets: 4, targetReps: 8, restSeconds: 120 }],
@@ -84,7 +84,7 @@ describe("RoutineService", () => {
     const repository = new InMemoryRoutineRepository();
     const { service } = createService(repository);
     const created = await service.create(input);
-    expect(created).toEqual({ id: "routine-1", name: "Piernas", daysOfWeek: ["monday", "thursday"], notes: "Técnica", exercises: [{ id: "template-1", exerciseId: "exercise-1", order: 0, targetSets: 4, targetReps: 8, restSeconds: 120 }] });
+     expect(created).toEqual({ id: "routine-1", name: "Piernas", daysOfWeek: ["monday", "thursday"], notes: "Técnica", exercises: [{ id: "template-1", exerciseId: "exercise-1", order: 0, targetSets: 4, targetReps: 8, sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }, { reps: 8 }], restSeconds: 120 }] });
     expect(repository.routines).toEqual([created]);
   });
 
@@ -124,6 +124,14 @@ describe("RoutineService", () => {
 
     await expect(service.update({ ...input, id: created.id, exercises: [{ ...input.exercises[0], targetReps: 0 }] })).rejects.toThrow("repeticiones");
     await expect(service.update({ ...input, id: created.id, exercises: [{ ...input.exercises[0], exerciseId: "missing" }] })).rejects.toThrow("no existe");
+  });
+
+  it("stores repetitions per set and validates a nonnegative starting weight", async () => {
+    const { service } = createService();
+    const created = await service.create({ ...input, exercises: [{ exerciseId: exercise.id, sets: [{ reps: 12 }, { reps: 10 }, { reps: 8 }], startingWeightKg: 20 }] });
+
+    expect(created.exercises[0]).toMatchObject({ targetSets: 3, targetReps: 12, sets: [{ reps: 12 }, { reps: 10 }, { reps: 8 }], startingWeightKg: 20 });
+    await expect(service.create({ ...input, exercises: [{ exerciseId: exercise.id, sets: [{ reps: 8 }], startingWeightKg: -1 }] })).rejects.toThrow("peso inicial");
   });
 
   it("preserves the existing routine id during update", async () => {

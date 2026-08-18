@@ -4,6 +4,7 @@ import type {
   RoutineTemplate,
   WorkoutSession,
   WorkoutSet,
+  SetType,
 } from "@/src/domain/models/workout";
 import type { RoutineRepository } from "@/src/domain/repositories/routine-repository";
 import type { WorkoutRepository } from "@/src/domain/repositories/workout-repository";
@@ -34,6 +35,8 @@ export interface WorkoutSetUpdateInput {
   id: EntityId;
   weight: number;
   reps: number;
+  setType: SetType;
+  notes?: string;
   isCompleted: boolean;
 }
 
@@ -143,6 +146,8 @@ export class ActiveWorkoutService {
       ...existing,
       weight: input.weight,
       reps: input.reps,
+      setType: input.setType,
+      notes: input.notes?.trim() || undefined,
       isCompleted: input.isCompleted,
     };
     await this.workoutRepository.updateSet(updated);
@@ -252,19 +257,27 @@ export class ActiveWorkoutService {
     return session;
   }
 
+  async cancel(sessionId: EntityId): Promise<void> {
+    await this.getActiveSession(sessionId);
+    await this.workoutRepository.deleteSessionsWithSets([sessionId]);
+  }
+
   private createWorkingSets(session: WorkoutSession, routine: RoutineTemplate): WorkoutSet[] {
-    return this.orderTemplateExercises(routine).flatMap((exercise) =>
-      Array.from({ length: exercise.targetSets }, (_, index) => ({
+    return this.orderTemplateExercises(routine).flatMap((exercise) => {
+      const configuredSets = exercise.sets?.length
+        ? exercise.sets
+        : Array.from({ length: exercise.targetSets }, () => ({ reps: exercise.targetReps }));
+      return configuredSets.map((configuredSet, index) => ({
         id: this.setIdGenerator(),
         sessionId: session.id,
         exerciseId: exercise.exerciseId,
         setNumber: index + 1,
         setType: "working" as const,
-        weight: 0,
-        reps: exercise.targetReps,
+        weight: exercise.startingWeightKg ?? 0,
+        reps: configuredSet.reps,
         isCompleted: false,
-      })),
-    );
+      }));
+    });
   }
 
   private orderTemplateExercises(routine: RoutineTemplate) {

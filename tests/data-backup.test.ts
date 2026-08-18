@@ -12,7 +12,7 @@ import { GymDatabase } from "@/src/infrastructure/persistence/indexed-db/databas
 const document: BackupDocument = {
   version: 1,
   exportedAt: "2026-08-16T12:00:00.000Z",
-  exercises: [{ id: "exercise-1", name: "Press", muscleGroup: "chest", category: "push" }],
+  exercises: [{ id: "exercise-1", name: "Press", muscleGroup: "chest", category: "push", mode: "weighted" }],
   routines: [{ id: "legacy", name: "Legacy", dayOfWeek: "thursday", exercises: [] }],
   workoutSessions: [{ id: "session-1", startTime: "2026-08-16T08:00:00.000Z" }],
   workoutSets: [{ id: "set-1", sessionId: "session-1", exerciseId: "exercise-1", setNumber: 1, setType: "working", weight: 60, reps: 8, isCompleted: true }],
@@ -28,6 +28,21 @@ describe("data backup contract", () => {
     expect(() => parseBackupDocument("not json")).toThrow("JSON válido");
     expect(() => parseBackupDocument(JSON.stringify({ ...document, version: 2 }))).toThrow("versión incompatible");
     expect(() => parseBackupDocument(JSON.stringify({ ...document, exercises: [{ id: "missing-name" }] }))).toThrow("respaldo válido");
+  });
+
+  it("normalizes legacy exercises without a mode to weighted", () => {
+    const legacy = { ...document, exercises: [{ id: "legacy", name: "Press", muscleGroup: "chest", category: "push" }], workoutSets: [{ ...document.workoutSets[0], exerciseId: "legacy" }] };
+    expect(parseBackupDocument(JSON.stringify(legacy)).exercises[0].mode).toBe("weighted");
+  });
+
+  it("accepts optional set notes and preserves them through backup serialization", () => {
+    const withNotes = { ...document, workoutSets: [{ ...document.workoutSets[0], notes: "Drop set en la última serie" }] };
+    expect(parseBackupDocument(serializeBackupDocument(withNotes)).workoutSets[0].notes).toBe("Drop set en la última serie");
+    expect(parseBackupDocument(JSON.stringify(document)).workoutSets[0].notes).toBeUndefined();
+  });
+
+  it("rejects non-string set notes", () => {
+    expect(() => parseBackupDocument(JSON.stringify({ ...document, workoutSets: [{ ...document.workoutSets[0], notes: 10 }] }))).toThrow("respaldo válido");
   });
 
   it("rejects orphan references before replacement", () => {

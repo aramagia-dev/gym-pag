@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
+import { useRouter } from "next/navigation";
 import {
   activeWorkoutService,
   exerciseCatalogService,
@@ -12,6 +13,7 @@ import type {
   RoutineTemplate,
   WorkoutSession,
   WorkoutSet,
+  SetType,
 } from "@/src/domain/models/workout";
 import { initialDraftValues, type DraftValues } from "./draft-defaults";
 import {
@@ -20,13 +22,46 @@ import {
   type DraftSaveStatus,
 } from "./draft-save-status";
 import { confirmFinish } from "./finish-confirmation";
-import { formatRestCountdown } from "./rest-timer";
+import {
+  adjustRestExpiry,
+  formatRestCountdown,
+  remainingRestSeconds,
+} from "./rest-timer";
 import {
   calculateElapsedSeconds,
   formatElapsedDuration,
 } from "./session-summary";
+import {
+  filterExercises,
+  type ExerciseFilters,
+} from "@/src/features/exercise-catalog/exercise-filters";
+import type { ExerciseCategory, MuscleGroup } from "@/src/domain/models/workout";
 
 type Draft = DraftValues & { saveStatus: DraftSaveStatus };
+
+const setTypeOptions: Array<{ value: SetType; label: string }> = [
+  { value: "working", label: "Trabajo" },
+  { value: "warm-up", label: "Calentamiento" },
+  { value: "top-set", label: "Serie principal" },
+  { value: "back-off", label: "Descarga" },
+  { value: "drop-set", label: "Drop set" },
+];
+
+const muscleGroups: Array<{ value: MuscleGroup; label: string }> = [
+  { value: "chest", label: "Pecho" }, { value: "back", label: "Espalda" },
+  { value: "shoulders", label: "Hombros" }, { value: "biceps", label: "Bíceps" },
+  { value: "triceps", label: "Tríceps" }, { value: "forearms", label: "Antebrazos" },
+  { value: "core", label: "Zona media" }, { value: "glutes", label: "Glúteos" },
+  { value: "quadriceps", label: "Cuádriceps" }, { value: "hamstrings", label: "Isquiotibiales" },
+  { value: "calves", label: "Pantorrillas" },
+];
+const categories: Array<{ value: ExerciseCategory; label: string }> = [
+  { value: "push", label: "Empuje" }, { value: "pull", label: "Tracción" },
+  { value: "hinge", label: "Bisagra" }, { value: "squat", label: "Sentadilla" },
+  { value: "lunge", label: "Zancada" }, { value: "carry", label: "Carga" },
+  { value: "rotation", label: "Rotación" }, { value: "isolation", label: "Aislamiento" },
+];
+const emptyFilters: ExerciseFilters = { search: "", muscleGroup: "all", category: "all" };
 
 function errorMessage(error: unknown) {
   return error instanceof Error
@@ -50,12 +85,26 @@ function updateDraftValue(
   }));
 }
 
+function updateDraftText(
+  setDrafts: Dispatch<SetStateAction<Record<string, Draft>>>,
+  setId: string,
+  field: "notes" | "setType",
+  value: string,
+) {
+  setDrafts((current) => ({
+    ...current,
+    [setId]: { ...current[setId], [field]: value, saveStatus: "unsaved" },
+  }));
+}
+
 export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
+  const router = useRouter();
   const [routine, setRoutine] = useState<RoutineTemplate | null>(null);
   const [catalog, setCatalog] = useState<Exercise[]>([]);
   const [exerciseNames, setExerciseNames] = useState<Record<string, string>>(
     {},
   );
+  const [exerciseModes, setExerciseModes] = useState<Record<string, Exercise["mode"]>>({});
   const [previousSets, setPreviousSets] = useState<
     Record<string, WorkoutSet[]>
   >({});
@@ -65,13 +114,18 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
   const draftSaveVersions = useRef<Record<string, number>>({});
   const finishRequested = useRef(false);
   const [selectedExercise, setSelectedExercise] = useState("");
+  const [addExerciseOpen, setAddExerciseOpen] = useState(false);
+  const [exerciseFilters, setExerciseFilters] = useState<ExerciseFilters>(emptyFilters);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [canceling, setCanceling] = useState(false);
   const [restTimer, setRestTimer] = useState<{
     expiresAt: number;
     setId: string;
+    exerciseId: string;
   } | null>(null);
+  const [restOverrides, setRestOverrides] = useState<Record<string, number>>({});
   const [restNow, setRestNow] = useState(() => Date.now());
   const [elapsedNow, setElapsedNow] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
@@ -111,9 +165,11 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
                   previousResults[exerciseIds.indexOf(set.exerciseId)]?.find(
                     (item) => item.setNumber === set.setNumber,
                   ),
-                  loadedRoutine?.exercises.find(
-                    (item) => item.exerciseId === set.exerciseId,
-                  )?.targetReps,
+                   loadedRoutine?.exercises.find(
+                     (item) => item.exerciseId === set.exerciseId,
+                   )?.sets?.[set.setNumber - 1]?.reps ?? loadedRoutine?.exercises.find(
+                     (item) => item.exerciseId === set.exerciseId,
+                   )?.targetReps,
                 ),
               ),
             ]),
@@ -123,6 +179,9 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
           Object.fromEntries(
             exercises.map((exercise) => [exercise.id, exercise.name]),
           ),
+        );
+        setExerciseModes(
+          Object.fromEntries(exercises.map((exercise) => [exercise.id, exercise.mode])),
         );
         setPreviousSets(
           Object.fromEntries(
@@ -198,7 +257,7 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
   }
 
   async function toggleSet(set: WorkoutSet) {
-    const draft = drafts[set.id] ?? { weight: set.weight, reps: set.reps };
+    const draft = drafts[set.id] ?? { weight: set.weight, reps: set.reps, setType: set.setType, notes: set.notes };
     setSaving(true);
     try {
       const updated = await activeWorkoutService.updateSet({
@@ -212,14 +271,18 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
       if (set.isCompleted) {
         setRestTimer(null);
       } else {
-        const restSeconds = routine?.exercises.find(
-          (item) => item.exerciseId === set.exerciseId,
-        )?.restSeconds;
+        const restSeconds =
+          restOverrides[set.exerciseId] ??
+          routine?.exercises.find(
+            (item) => item.exerciseId === set.exerciseId,
+          )?.restSeconds;
         if (restSeconds && restSeconds > 0) {
-          setRestNow(Date.now());
+          const now = Date.now();
+          setRestNow(now);
           setRestTimer({
-            expiresAt: Date.now() + restSeconds * 1000,
+            expiresAt: now + restSeconds * 1000,
             setId: set.id,
+            exerciseId: set.exerciseId,
           });
         } else {
           setRestTimer(null);
@@ -231,6 +294,35 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  function adjustCurrentRest(adjustmentSeconds: number) {
+    if (!restTimer) return;
+    const now = Date.now();
+    const expiresAt = adjustRestExpiry(
+      restTimer.expiresAt,
+      now,
+      adjustmentSeconds,
+    );
+    const configuredRestSeconds =
+      restOverrides[restTimer.exerciseId] ??
+      routine?.exercises.find(
+        (item) => item.exerciseId === restTimer.exerciseId,
+      )?.restSeconds ??
+      restRemaining;
+    setRestNow(now);
+    setRestOverrides((current) => ({
+      ...current,
+      [restTimer.exerciseId]: Math.max(
+        0,
+        configuredRestSeconds + adjustmentSeconds,
+      ),
+    }));
+    setRestTimer(
+      expiresAt
+        ? { ...restTimer, expiresAt }
+        : null,
+    );
   }
 
   async function addExercise() {
@@ -258,6 +350,8 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
         ),
       }));
       setSelectedExercise("");
+      setExerciseFilters(emptyFilters);
+      setAddExerciseOpen(false);
       setError(null);
     } catch (reason: unknown) {
       setError(errorMessage(reason));
@@ -301,7 +395,7 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
           remaining.map((set) => [
             set.id,
             current[set.id] ??
-              saveStatusDraft({ weight: set.weight, reps: set.reps }),
+               saveStatusDraft({ weight: set.weight, reps: set.reps, setType: set.setType, notes: set.notes }),
           ]),
         ),
       );
@@ -328,7 +422,7 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
           remaining.map((set) => [
             set.id,
             current[set.id] ??
-              saveStatusDraft({ weight: set.weight, reps: set.reps }),
+               saveStatusDraft({ weight: set.weight, reps: set.reps, setType: set.setType, notes: set.notes }),
           ]),
         ),
       );
@@ -375,6 +469,19 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
     }
   }
 
+  async function cancel() {
+    if (!window.confirm("¿Desea cancelar esta sesión? Se eliminarán la sesión y todas sus series, y no aparecerá en el historial.")) return;
+    setCanceling(true);
+    setError(null);
+    try {
+      await activeWorkoutService.cancel(sessionId);
+      router.replace("/routines");
+    } catch (reason: unknown) {
+      setError(errorMessage(reason));
+      setCanceling(false);
+    }
+  }
+
   const completed = sets.filter((set) => set.isCompleted).length;
   const sessionExerciseIds = [...new Set(sets.map((set) => set.exerciseId))];
   const groups = sessionExerciseIds.map((exerciseId) => ({
@@ -384,12 +491,13 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
   const availableExercises = catalog.filter(
     (exercise) => !sessionExerciseIds.includes(exercise.id),
   );
-  const controlsDisabled = saving || finishing;
+  const filteredAvailableExercises = filterExercises(availableExercises, exerciseFilters);
+  const controlsDisabled = saving || finishing || canceling;
   const restRemaining = restTimer
-    ? Math.ceil(Math.max(0, restTimer.expiresAt - restNow) / 1000)
+    ? remainingRestSeconds(restTimer.expiresAt, restNow)
     : 0;
   const completedVolume = sets.reduce(
-    (total, set) => (set.isCompleted ? total + set.weight * set.reps : total),
+    (total, set) => set.isCompleted ? total + set.weight * set.reps : total,
     0,
   );
   const completionPercentage = sets.length
@@ -509,14 +617,14 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
               {completed} de {sets.length} series completadas
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void finish()}
-            disabled={controlsDisabled}
-            className="min-h-11 rounded-xl bg-cyan-400 px-4 text-sm font-bold text-slate-950 disabled:opacity-60"
-          >
-            {finishing ? "Finalizando..." : "Finalizar sesión"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => void cancel()} disabled={controlsDisabled} className="min-h-11 rounded-xl border border-rose-900 px-4 text-sm font-bold text-rose-300 disabled:opacity-60">
+              {canceling ? "Cancelando..." : "Cancelar sesión"}
+            </button>
+            <button type="button" onClick={() => void finish()} disabled={controlsDisabled} className="min-h-11 rounded-xl bg-cyan-400 px-4 text-sm font-bold text-slate-950 disabled:opacity-60">
+              {finishing ? "Finalizando..." : "Finalizar sesión"}
+            </button>
+          </div>
         </header>
         <section
           className="mb-6 rounded-2xl border border-slate-800 bg-slate-900 p-4"
@@ -580,49 +688,34 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
                 </span>
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setRestTimer(null)}
-              disabled={controlsDisabled}
-              className="min-h-11 rounded-lg border border-cyan-300 px-3 text-sm font-semibold text-cyan-100 disabled:opacity-50"
-            >
-              Omitir descanso
-            </button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => adjustCurrentRest(-15)}
+                disabled={controlsDisabled}
+                className="min-h-11 rounded-lg border border-cyan-300 px-3 text-sm font-semibold text-cyan-100 disabled:opacity-50"
+              >
+                -15 segundos
+              </button>
+              <button
+                type="button"
+                onClick={() => adjustCurrentRest(15)}
+                disabled={controlsDisabled}
+                className="min-h-11 rounded-lg border border-cyan-300 px-3 text-sm font-semibold text-cyan-100 disabled:opacity-50"
+              >
+                +15 segundos
+              </button>
+              <button
+                type="button"
+                onClick={() => setRestTimer(null)}
+                disabled={controlsDisabled}
+                className="min-h-11 rounded-lg border border-cyan-300 px-3 text-sm font-semibold text-cyan-100 disabled:opacity-50"
+              >
+                Omitir descanso
+              </button>
+            </div>
           </section>
         )}
-        <div className="mb-6 flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900 p-3 sm:flex-row sm:items-end">
-          <label
-            htmlFor="add-exercise"
-            className="flex-1 text-sm text-slate-300"
-          >
-            Agregar ejercicio
-            <select
-              id="add-exercise"
-              aria-label="Agregar ejercicio"
-              value={selectedExercise}
-              onChange={(event) =>
-                setSelectedExercise(event.currentTarget.value)
-              }
-              disabled={controlsDisabled}
-              className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-base text-white"
-            >
-              <option value="">Seleccionar ejercicio</option>
-              {availableExercises.map((exercise) => (
-                <option key={exercise.id} value={exercise.id}>
-                  {exercise.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={() => void addExercise()}
-            disabled={!selectedExercise || controlsDisabled}
-            className="min-h-11 rounded-lg border border-cyan-400 px-4 text-sm font-semibold text-cyan-300 disabled:opacity-50"
-          >
-            {saving ? "Guardando..." : "Agregar"}
-          </button>
-        </div>
         {error && (
           <p
             role="alert"
@@ -675,9 +768,12 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-semibold">
-                    {exerciseNames[group.exerciseId] ?? "Ejercicio"}
-                  </h2>
+                   <h2 className="text-lg font-semibold">
+                     {exerciseNames[group.exerciseId] ?? "Ejercicio"}
+                   </h2>
+                   <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-violet-300">
+                     {exerciseModes[group.exerciseId] === "bodyweight" ? "Peso corporal · carga adicional opcional" : "Ejercicio con peso"}
+                   </p>
                   <div className="mt-2 flex gap-2">
                     <button
                       type="button"
@@ -719,18 +815,18 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
                   return (
                     <div
                       key={set.id}
-                      className={`grid grid-cols-2 gap-2 rounded-xl border p-3 sm:grid-cols-[auto_1fr_1fr_auto] sm:items-end ${set.isCompleted ? "border-cyan-500/50 bg-cyan-950/20" : "border-slate-800"}`}
+                      className={`grid grid-cols-2 gap-2 rounded-xl border p-3 sm:grid-cols-[auto_1fr_1fr_1fr_auto] sm:items-end ${set.isCompleted ? "border-cyan-500/50 bg-cyan-950/20" : "border-slate-800"}`}
                     >
                       <div className="col-span-2 text-sm text-slate-400 sm:col-span-1 sm:pb-3">
                         <span>Serie {set.setNumber}</span>
                         <p className="mt-1 text-xs text-slate-500">
                           {previous
-                            ? `Anterior: ${previous.weight} kg × ${previous.reps}`
+                            ? `Anterior: ${previous.weight > 0 ? `${previous.weight} kg × ` : "Peso corporal × "}${previous.reps}`
                             : "Sin registro anterior"}
                         </p>
                       </div>
                       <label className="min-w-0 text-xs text-slate-400">
-                        Peso
+                        {exerciseModes[set.exerciseId] === "bodyweight" ? "Carga adicional (kg)" : "Peso (kg)"}
                         <input
                           aria-label={`Peso, serie ${set.setNumber}`}
                           type="number"
@@ -771,6 +867,40 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
                           className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 text-base text-white"
                         />
                       </label>
+                      <label className="col-span-2 min-w-0 text-xs text-slate-400 sm:col-span-1">
+                        Tipo de serie
+                        <select
+                          aria-label={`Tipo de serie ${set.setNumber}`}
+                          value={drafts[set.id]?.setType ?? set.setType}
+                          onChange={(event) =>
+                            updateDraftText(setDrafts, set.id, "setType", event.currentTarget.value)
+                          }
+                          onBlur={() => void saveSet(set)}
+                          disabled={controlsDisabled}
+                          className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 text-base text-white"
+                        >
+                          {setTypeOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="col-span-2 min-w-0 text-xs text-slate-400 sm:col-span-1">
+                        Nota de la serie
+                        <input
+                          aria-label={`Nota de la serie ${set.setNumber}`}
+                          type="text"
+                          value={drafts[set.id]?.notes ?? ""}
+                          onChange={(event) =>
+                            updateDraftText(setDrafts, set.id, "notes", event.currentTarget.value)
+                          }
+                          onBlur={() => void saveSet(set)}
+                          disabled={controlsDisabled}
+                          placeholder="Ej.: drop set en la última serie"
+                          className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 text-base text-white"
+                        />
+                      </label>
                       <button
                         type="button"
                         onClick={() => void toggleSet(set)}
@@ -803,6 +933,47 @@ export default function ActiveWorkout({ sessionId }: { sessionId: string }) {
             </section>
           ))}
         </div>
+        <div className="mt-6 border-t border-slate-800 pt-6">
+          <button type="button" onClick={() => setAddExerciseOpen(true)} disabled={controlsDisabled || availableExercises.length === 0} className="min-h-12 w-full rounded-xl border border-cyan-400 px-4 text-sm font-bold text-cyan-300 disabled:opacity-50">
+            Agregar ejercicio
+          </button>
+        </div>
+        {addExerciseOpen && (
+          <div className="fixed inset-0 z-10 flex items-center justify-center bg-slate-950/80 p-4" role="presentation">
+            <div role="dialog" aria-modal="true" aria-labelledby="add-exercise-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 id="add-exercise-title" className="text-xl font-bold">Agregar ejercicio</h2>
+                  <p className="mt-1 text-sm text-slate-400">Filtre y seleccione un ejercicio para esta sesión.</p>
+                </div>
+                <button type="button" onClick={() => { setAddExerciseOpen(false); setSelectedExercise(""); }} className="min-h-11 rounded-lg border border-slate-700 px-3 text-sm text-slate-300">Cerrar</button>
+              </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <label className="text-sm text-slate-300 sm:col-span-3">Buscar
+                  <input value={exerciseFilters.search} onChange={(event) => setExerciseFilters((current) => ({ ...current, search: event.currentTarget.value }))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-base text-white" placeholder="Nombre o nota" />
+                </label>
+                <label className="text-sm text-slate-300">Grupo muscular
+                  <select value={exerciseFilters.muscleGroup} onChange={(event) => setExerciseFilters((current) => ({ ...current, muscleGroup: event.currentTarget.value as ExerciseFilters["muscleGroup"] }))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 text-base text-white">
+                    <option value="all">Todos</option>{muscleGroups.map((group) => <option key={group.value} value={group.value}>{group.label}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm text-slate-300 sm:col-span-2">Categoría / patrón
+                  <select value={exerciseFilters.category} onChange={(event) => setExerciseFilters((current) => ({ ...current, category: event.currentTarget.value as ExerciseFilters["category"] }))} className="mt-1 min-h-11 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 text-base text-white">
+                    <option value="all">Todas</option>{categories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
+                  </select>
+                </label>
+              </div>
+              <div className="mt-5 space-y-2" role="listbox" aria-label="Ejercicios disponibles">
+                {filteredAvailableExercises.map((exercise) => <button key={exercise.id} type="button" role="option" aria-selected={selectedExercise === exercise.id} onClick={() => setSelectedExercise(exercise.id)} className={`block min-h-12 w-full rounded-lg border px-3 text-left text-sm ${selectedExercise === exercise.id ? "border-cyan-400 bg-cyan-950/40 text-cyan-100" : "border-slate-700 text-slate-200"}`}>{exercise.name}</button>)}
+                {filteredAvailableExercises.length === 0 && <p className="rounded-lg border border-dashed border-slate-700 p-4 text-sm text-slate-400">No hay ejercicios que coincidan con los filtros.</p>}
+              </div>
+              <div className="mt-5 flex justify-end gap-2">
+                <button type="button" onClick={() => { setAddExerciseOpen(false); setSelectedExercise(""); }} className="min-h-11 rounded-lg border border-slate-700 px-4 text-sm text-slate-300">Cancelar</button>
+                <button type="button" onClick={() => void addExercise()} disabled={!selectedExercise || controlsDisabled} className="min-h-11 rounded-lg bg-cyan-400 px-4 text-sm font-bold text-slate-950 disabled:opacity-50">{saving ? "Guardando..." : "Agregar ejercicio"}</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

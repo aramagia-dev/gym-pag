@@ -88,6 +88,21 @@ describe("ActiveWorkoutService", () => {
     expect(workout.atomicCreateCalls).toHaveLength(1);
   });
 
+  it("creates configured repetitions and starting weight only for a new session", async () => {
+    const configuredRoutine: RoutineTemplate = {
+      ...routine,
+      exercises: [{ id: "template-1", exerciseId: "exercise-1", order: 0, targetSets: 3, targetReps: 12, sets: [{ reps: 12 }, { reps: 10 }, { reps: 8 }], startingWeightKg: 20 }],
+    };
+    const { service, workout } = createService(new InMemoryWorkoutRepository(), configuredRoutine);
+    const active = await service.startFromRoutine(configuredRoutine.id);
+
+    expect(active.sets.map((set) => ({ reps: set.reps, weight: set.weight }))).toEqual([{ reps: 12, weight: 20 }, { reps: 10, weight: 20 }, { reps: 8, weight: 20 }]);
+    active.sets[0].weight = 35;
+    active.sets[0].isCompleted = true;
+    workout.sets[0] = active.sets[0];
+    await expect(service.startFromRoutine(configuredRoutine.id)).resolves.toMatchObject({ sets: expect.arrayContaining([expect.objectContaining({ weight: 35, isCompleted: true })]) });
+  });
+
   it("rejects a missing routine", async () => {
     await expect(createService(undefined, null).service.startFromRoutine("missing")).rejects.toThrow("rutina");
   });
@@ -216,8 +231,8 @@ describe("ActiveWorkoutService", () => {
   it("updates only editable values and validates them", async () => {
     const { service } = createService();
     const { sets } = await service.startFromRoutine("routine-1");
-    const updated = await service.updateSet({ id: sets[0].id, weight: 40, reps: 8, isCompleted: true });
-    expect(updated).toMatchObject({ id: sets[0].id, sessionId: "session-1", exerciseId: "exercise-1", setNumber: 1, setType: "working", weight: 40, reps: 8, isCompleted: true });
+    const updated = await service.updateSet({ id: sets[0].id, weight: 40, reps: 8, setType: "drop-set", notes: "Última serie", isCompleted: true });
+    expect(updated).toMatchObject({ id: sets[0].id, sessionId: "session-1", exerciseId: "exercise-1", setNumber: 1, setType: "drop-set", weight: 40, reps: 8, notes: "Última serie", isCompleted: true });
     await expect(service.updateSet({ ...updated, weight: Number.NaN })).rejects.toThrow("peso");
     await expect(service.updateSet({ ...updated, id: "missing" })).rejects.toThrow("serie");
   });
@@ -229,6 +244,27 @@ describe("ActiveWorkoutService", () => {
     const finished = await service.finish("session-1");
     expect(finished.endTime).toBe("2026-08-16T10:00:00.000Z");
     await expect(service.finish("missing")).rejects.toThrow("sesión");
+  });
+
+  it("cancels an active session and removes all of its sets", async () => {
+    const { service, workout } = createService();
+    await service.startFromRoutine("routine-1");
+
+    await service.cancel("session-1");
+
+    expect(workout.sessions).toEqual([]);
+    expect(workout.sets).toEqual([]);
+  });
+
+  it("rejects cancelling missing or finished sessions without deleting them", async () => {
+    const { service, workout } = createService();
+    await service.startFromRoutine("routine-1");
+    workout.sessions[0] = { ...workout.sessions[0], endTime: "2026-08-16T11:00:00.000Z" };
+
+    await expect(service.cancel("missing")).rejects.toThrow("sesión");
+    await expect(service.cancel("session-1")).rejects.toThrow("finalizó");
+    expect(workout.sessions).toHaveLength(1);
+    expect(workout.sets).toHaveLength(3);
   });
 
   it("delegates previous completed set lookup and preserves repository ordering", async () => {
@@ -265,14 +301,20 @@ describe("ActiveWorkoutService", () => {
   });
 
   it("removes a set and renumbers the remaining sets for that exercise", async () => {
-    const { service } = createService();
+    const { service, workout } = createService();
     const { sets } = await service.startFromRoutine("routine-1");
     const added = await service.addSet("session-1", "exercise-1");
+    workout.sets = workout.sets.map((set) =>
+      set.id === sets[1].id ? { ...set, notes: "Mantener esta nota" } :
+      set.id === added.id ? { ...set, notes: "Nota de la serie nueva" } : set,
+    );
 
     const remaining = await service.removeSet("session-1", sets[0].id);
 
     expect(remaining.filter((set) => set.exerciseId === "exercise-1").map((set) => set.setNumber)).toEqual([1, 2]);
     expect(remaining.map((set) => set.id)).toEqual([sets[1].id, added.id, sets[2].id]);
+    expect(remaining.find((set) => set.id === sets[1].id)?.notes).toBe("Mantener esta nota");
+    expect(remaining.find((set) => set.id === added.id)?.notes).toBe("Nota de la serie nueva");
   });
 
   it("removes every set belonging to an exercise", async () => {
@@ -309,7 +351,7 @@ describe("ActiveWorkoutService", () => {
     await expect(service.addExercise("missing", "exercise-3")).rejects.toThrow("sesión");
     await expect(service.addSet("session-1", "exercise-1")).rejects.toThrow("finalizó");
     await expect(service.removeSet("session-1", "missing")).rejects.toThrow("finalizó");
-    await expect(service.updateSet({ id: sets[0].id, weight: 10, reps: 5, isCompleted: false })).rejects.toThrow("finalizó");
+    await expect(service.updateSet({ id: sets[0].id, weight: 10, reps: 5, setType: "working", isCompleted: false })).rejects.toThrow("finalizó");
   });
 
   it("rejects removing a set that belongs to another session", async () => {

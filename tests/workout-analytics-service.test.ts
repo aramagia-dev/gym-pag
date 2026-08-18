@@ -43,7 +43,7 @@ const sets: WorkoutSet[] = [
   { id: "new-1", sessionId: "new", exerciseId: "press", setNumber: 1, setType: "working", weight: 20, reps: 3, isCompleted: true },
 ];
 
-function service() { return new WorkoutAnalyticsService(new MemoryWorkout(sessions, sets), new MemoryRoutines([routine]), new MemoryExercises([{ id: "press", name: "Press", muscleGroup: "chest", category: "push" }])); }
+function service() { return new WorkoutAnalyticsService(new MemoryWorkout(sessions, sets), new MemoryRoutines([routine]), new MemoryExercises([{ id: "press", name: "Press", muscleGroup: "chest", category: "push", mode: "weighted" }])); }
 
 describe("WorkoutAnalyticsService", () => {
   it("sorts history, distinguishes status, falls back to free workout, and counts completed volume only", async () => {
@@ -58,5 +58,15 @@ describe("WorkoutAnalyticsService", () => {
     expect(metrics.summary).toEqual({ sessions: 1, completedSets: 1, totalVolumeKg: 250, averageVolumeKg: 250 });
     expect(metrics.volumeOverTime).toEqual([{ date: "2026-08-10", volumeKg: 250 }]);
     expect(metrics.volumeByExercise).toEqual([{ exerciseId: "press", exerciseName: "Press", volumeKg: 250 }]);
+  });
+
+  it("counts bodyweight sets without inventing volume and uses external load when present", async () => {
+    const exercise: Exercise = { id: "pull-up", name: "Dominadas", muscleGroup: "back", category: "pull", mode: "bodyweight" };
+    const workout = new MemoryWorkout([{ id: "bodyweight", startTime: "2026-08-16T10:00:00.000Z", endTime: "2026-08-16T11:00:00.000Z" }], [
+      { id: "bw-1", sessionId: "bodyweight", exerciseId: "pull-up", setNumber: 1, setType: "working", weight: 0, reps: 8, isCompleted: true },
+      { id: "bw-2", sessionId: "bodyweight", exerciseId: "pull-up", setNumber: 2, setType: "working", weight: 10, reps: 5, isCompleted: true },
+    ]);
+    const result = await new WorkoutAnalyticsService(workout, new MemoryRoutines([]), new MemoryExercises([exercise])).getHistory();
+    expect(result[0]).toMatchObject({ completedSets: 2, completedVolumeKg: 50 });
   });
 });

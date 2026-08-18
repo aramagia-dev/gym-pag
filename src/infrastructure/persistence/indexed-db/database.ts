@@ -1,14 +1,14 @@
 import Dexie, { type EntityTable } from "dexie";
 
 import type {
-  Exercise,
   PersistedRoutineTemplate,
   WorkoutSession,
   WorkoutSet,
+  PersistedExercise,
 } from "@/src/domain/models/workout";
 
 export class GymDatabase extends Dexie {
-  exercises!: EntityTable<Exercise, "id">;
+  exercises!: EntityTable<PersistedExercise, "id">;
   routines!: EntityTable<PersistedRoutineTemplate, "id">;
   workoutSessions!: EntityTable<WorkoutSession, "id">;
   workoutSets!: EntityTable<WorkoutSet, "id">;

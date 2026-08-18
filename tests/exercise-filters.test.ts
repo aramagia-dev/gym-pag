@@ -4,9 +4,9 @@ import type { Exercise } from "@/src/domain/models/workout";
 import { filterExercises } from "@/src/features/exercise-catalog/exercise-filters";
 
 const exercises: Exercise[] = [
-  { id: "1", name: "Press inclinado", muscleGroup: "chest", category: "push", notes: "Controlar el descenso" },
-  { id: "2", name: "Curl de bíceps", muscleGroup: "biceps", category: "isolation", notes: "Sin balanceo" },
-  { id: "3", name: "Remo con barra", muscleGroup: "back", category: "pull", notes: "Espalda neutra" },
+  { id: "1", name: "Press inclinado", muscleGroup: "chest", category: "push", mode: "weighted", notes: "Controlar el descenso" },
+  { id: "2", name: "Curl de bíceps", muscleGroup: "biceps", category: "isolation", mode: "weighted", notes: "Sin balanceo" },
+  { id: "3", name: "Remo con barra", muscleGroup: "back", category: "pull", mode: "weighted", notes: "Espalda neutra" },
 ];
 
 const noFilters = { search: "", muscleGroup: "all" as const, category: "all" as const };

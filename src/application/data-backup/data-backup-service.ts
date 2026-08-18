@@ -1,8 +1,11 @@
+import {
+  normalizeExercise,
+} from "@/src/domain/models/workout";
 import type {
-  Exercise,
   PersistedRoutineTemplate,
   WorkoutSession,
   WorkoutSet,
+  PersistedExercise,
 } from "@/src/domain/models/workout";
 
 export const BACKUP_VERSION = 1 as const;
@@ -10,7 +13,7 @@ export const BACKUP_VERSION = 1 as const;
 export interface BackupDocument {
   version: typeof BACKUP_VERSION;
   exportedAt: string;
-  exercises: Exercise[];
+  exercises: PersistedExercise[];
   routines: PersistedRoutineTemplate[];
   workoutSessions: WorkoutSession[];
   workoutSets: WorkoutSet[];
@@ -50,17 +53,20 @@ function isIsoDate(value: unknown): value is string {
   return typeof value === "string" && !Number.isNaN(Date.parse(value));
 }
 
-function validateExercise(value: unknown): value is Exercise {
+function validateExercise(value: unknown): value is PersistedExercise {
   if (!isRecord(value) || !isNonEmptyString(value.id) || !isNonEmptyString(value.name)) return false;
   if (typeof value.muscleGroup !== "string" || !muscleGroups.has(value.muscleGroup) || typeof value.category !== "string" || !categories.has(value.category)) return false;
+  if (value.mode !== undefined && value.mode !== "weighted" && value.mode !== "bodyweight") return false;
   return (value.notes === undefined || typeof value.notes === "string") &&
     (value.imageUrl === undefined || typeof value.imageUrl === "string");
 }
 
 function validateTemplateExercise(value: unknown): boolean {
   if (!isRecord(value) || !isNonEmptyString(value.id) || !isNonEmptyString(value.exerciseId)) return false;
-  return isInteger(value.order) && isInteger(value.targetSets) && value.targetSets > 0 &&
-    isInteger(value.targetReps) && value.targetReps > 0 &&
+  const hasLegacyTargets = isInteger(value.targetSets) && value.targetSets > 0 && isInteger(value.targetReps) && value.targetReps > 0;
+  const hasSets = Array.isArray(value.sets) && value.sets.length > 0 && value.sets.every((set) => isRecord(set) && isInteger(set.reps) && set.reps > 0);
+  return isInteger(value.order) && (hasLegacyTargets || hasSets) &&
+    (value.startingWeightKg === undefined || (isFiniteNumber(value.startingWeightKg) && value.startingWeightKg >= 0)) &&
     (value.restSeconds === undefined || (isInteger(value.restSeconds) && value.restSeconds >= 0));
 }
 
@@ -86,7 +92,8 @@ function validateSet(value: unknown): value is WorkoutSet {
   return isInteger(value.setNumber) && value.setNumber > 0 && typeof value.setType === "string" && setTypes.has(value.setType) &&
     isFiniteNumber(value.weight) && value.weight >= 0 && isFiniteNumber(value.reps) && value.reps >= 0 &&
     typeof value.isCompleted === "boolean" &&
-    (value.rir === undefined || (isFiniteNumber(value.rir) && value.rir >= 0));
+    (value.rir === undefined || (isFiniteNumber(value.rir) && value.rir >= 0)) &&
+    (value.notes === undefined || typeof value.notes === "string");
 }
 
 function hasDuplicateIds(values: Array<{ id: string }>): boolean {
@@ -100,7 +107,7 @@ export function validateBackupDocument(value: unknown): value is BackupDocument 
     !Array.isArray(value.workoutSessions) || !value.workoutSessions.every(validateSession) ||
     !Array.isArray(value.workoutSets) || !value.workoutSets.every(validateSet)) return false;
 
-  const exercises = value.exercises as Exercise[];
+  const exercises = value.exercises as PersistedExercise[];
   const routines = value.routines as PersistedRoutineTemplate[];
   const sessions = value.workoutSessions as WorkoutSession[];
   const sets = value.workoutSets as WorkoutSet[];
@@ -125,9 +132,13 @@ export function validateBackupDocument(value: unknown): value is BackupDocument 
   return sets.every((set) => sessionIds.has(set.sessionId) && exerciseIds.has(set.exerciseId));
 }
 
+function normalizeBackupDocument(document: BackupDocument): BackupDocument {
+  return { ...document, exercises: document.exercises.map((exercise) => normalizeExercise(exercise)) };
+}
+
 export function serializeBackupDocument(document: BackupDocument): string {
   if (!validateBackupDocument(document)) throw new Error("El documento de respaldo no tiene un formato válido.");
-  return JSON.stringify(document, null, 2);
+  return JSON.stringify(normalizeBackupDocument(document), null, 2);
 }
 
 export function parseBackupDocument(json: string): BackupDocument {
@@ -138,7 +149,7 @@ export function parseBackupDocument(json: string): BackupDocument {
     throw new Error("El archivo no contiene JSON válido.");
   }
   if (!validateBackupDocument(value)) throw new Error("El archivo no es un respaldo válido de Gym Pag o usa una versión incompatible.");
-  return value;
+  return normalizeBackupDocument(value);
 }
 
 export class DataBackupService {

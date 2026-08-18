@@ -1,4 +1,4 @@
-import type { Exercise } from "@/src/domain/models/workout";
+import type { Exercise, PersistedExercise } from "@/src/domain/models/workout";
 
 import { defaultExercises } from "./default-exercises";
 import type { GymDatabase } from "./database";
@@ -64,7 +64,7 @@ async function migrateDeprecatedExercises(db: GymDatabase): Promise<void> {
   }
 }
 
-function isUntouchedPreviousDefault(exercise: Exercise): boolean {
+function isUntouchedPreviousDefault(exercise: PersistedExercise): boolean {
   return exercise.name === previousOverheadPress.name
     && exercise.muscleGroup === previousOverheadPress.muscleGroup
     && exercise.category === previousOverheadPress.category

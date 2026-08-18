@@ -25,6 +25,8 @@ export type ExerciseCategory =
   | "rotation"
   | "isolation";
 
+export type ExerciseMode = "weighted" | "bodyweight";
+
 export type SetType =
   | "warm-up"
   | "working"
@@ -46,8 +48,15 @@ export interface Exercise {
   name: string;
   muscleGroup: MuscleGroup;
   category: ExerciseCategory;
+  mode: ExerciseMode;
   notes?: string;
   imageUrl?: string;
+}
+
+export type PersistedExercise = Omit<Exercise, "mode"> & { mode?: ExerciseMode };
+
+export function normalizeExercise(exercise: PersistedExercise): Exercise {
+  return { ...exercise, mode: exercise.mode ?? "weighted" };
 }
 
 export interface TemplateExercise {
@@ -56,7 +65,13 @@ export interface TemplateExercise {
   order: number;
   targetSets: number;
   targetReps: number;
+  sets?: TemplateSet[];
+  startingWeightKg?: number;
   restSeconds?: number;
+}
+
+export interface TemplateSet {
+  reps: number;
 }
 
 export interface RoutineTemplate {
@@ -74,10 +89,16 @@ export type PersistedRoutineTemplate =
 export function normalizeRoutineTemplate(
   routine: PersistedRoutineTemplate,
 ): RoutineTemplate {
-  if ("daysOfWeek" in routine) return routine;
+  const normalizedExercises = routine.exercises.map((exercise) => ({
+    ...exercise,
+    sets: exercise.sets?.length
+      ? exercise.sets.map((set) => ({ reps: set.reps }))
+      : Array.from({ length: exercise.targetSets }, () => ({ reps: exercise.targetReps })),
+  }));
+  if ("daysOfWeek" in routine) return { ...routine, exercises: normalizedExercises };
 
   const { dayOfWeek, ...currentRoutine } = routine;
-  return { ...currentRoutine, daysOfWeek: [dayOfWeek] };
+  return { ...currentRoutine, exercises: normalizedExercises, daysOfWeek: [dayOfWeek] };
 }
 
 export interface WorkoutSession {
@@ -98,5 +119,6 @@ export interface WorkoutSet {
   weight: number;
   reps: number;
   rir?: number;
+  notes?: string;
   isCompleted: boolean;
 }

@@ -1,8 +1,8 @@
-import type { Exercise, EntityId } from "@/src/domain/models/workout";
+import { normalizeExercise, type Exercise, type EntityId, type PersistedExercise } from "@/src/domain/models/workout";
 import type { ExerciseRepository } from "@/src/domain/repositories/exercise-repository";
 import type { ExerciseReferenceReader } from "./exercise-reference-reader";
 
-export type ExerciseInput = Omit<Exercise, "id">;
+export type ExerciseInput = Omit<PersistedExercise, "id">;
 
 export type ExerciseUpdateInput = ExerciseInput & {
   id: EntityId;
@@ -20,21 +20,21 @@ export class ExerciseCatalogService {
   ) {}
 
   list(): Promise<Exercise[]> {
-    return this.repository.findAll();
+    return this.repository.findAll().then((items) => items.map(normalizeExercise));
   }
 
   get(id: EntityId): Promise<Exercise | null> {
-    return this.repository.findById(id);
+    return this.repository.findById(id).then((exercise) => exercise ? normalizeExercise(exercise) : null);
   }
 
   async create(input: ExerciseInput): Promise<Exercise> {
     const { imageUrl, ...exerciseInput } = input;
-    const exercise: Exercise = {
+    const exercise: Exercise = normalizeExercise({
       ...exerciseInput,
       id: this.idGenerator(),
       name: this.normalizeName(input.name),
       ...this.normalizedImage(imageUrl),
-    };
+    });
 
     await this.repository.create(exercise);
     return exercise;
@@ -42,11 +42,11 @@ export class ExerciseCatalogService {
 
   async update(input: ExerciseUpdateInput): Promise<Exercise> {
     const { imageUrl, ...exerciseInput } = input;
-    const exercise: Exercise = {
+    const exercise: Exercise = normalizeExercise({
       ...exerciseInput,
       name: this.normalizeName(input.name),
       ...this.normalizedImage(imageUrl),
-    };
+    });
 
     await this.repository.update(exercise);
     return exercise;

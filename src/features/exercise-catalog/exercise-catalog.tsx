@@ -7,6 +7,7 @@ import { exerciseCatalogService } from "@/src/application/composition";
 import type {
   Exercise,
   ExerciseCategory,
+  ExerciseMode,
   MuscleGroup,
 } from "@/src/domain/models/workout";
 import type {
@@ -38,6 +39,7 @@ const emptyForm: FormState = {
   name: "",
   muscleGroup: "chest",
   category: "push",
+  mode: "weighted",
   notes: "",
 };
 
@@ -100,6 +102,7 @@ export default function ExerciseCatalog() {
       name: exercise.name,
       muscleGroup: exercise.muscleGroup,
       category: exercise.category,
+      mode: exercise.mode,
       notes: exercise.notes ?? "",
       imageUrl: exercise.imageUrl,
     });
@@ -201,7 +204,7 @@ export default function ExerciseCatalog() {
            <nav className="flex flex-wrap gap-2 text-sm"><Link className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/">Inicio</Link><a className="min-h-11 rounded-lg bg-cyan-400 px-3 py-2.5 font-semibold text-slate-950" href="/exercises">Ejercicios</a><a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/routines">Rutinas</a><a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/history">Historial</a><a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/analytics">Progreso</a><a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/data">Datos</a></nav>
         </header>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-2xl shadow-black/20 sm:p-6" aria-labelledby="form-title">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
@@ -228,6 +231,13 @@ export default function ExerciseCatalog() {
                   Categoría / patrón
                   <select id="exercise-category" value={form.category} onChange={(event) => updateField("category", event.target.value as ExerciseCategory)} className="mt-2 min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-base text-white outline-none ring-cyan-400 focus:ring-2">
                     {categories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
+                  </select>
+                </label>
+                <label className="block text-sm font-medium text-slate-200" htmlFor="exercise-mode">
+                  Modalidad
+                  <select id="exercise-mode" value={form.mode} onChange={(event) => updateField("mode", event.target.value as ExerciseMode)} className="mt-2 min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-base text-white outline-none ring-cyan-400 focus:ring-2">
+                    <option value="weighted">Con peso</option>
+                    <option value="bodyweight">Peso corporal</option>
                   </select>
                 </label>
               </div>
@@ -302,7 +312,8 @@ export default function ExerciseCatalog() {
                       <h3 className="truncate text-lg font-semibold text-white">{exercise.name}</h3>
                       <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
                         <span className="rounded-full bg-cyan-400/10 px-2.5 py-1 text-cyan-300">{displayLabel(muscleGroups, exercise.muscleGroup)}</span>
-                        <span className="rounded-full bg-slate-800 px-2.5 py-1 text-slate-300">{displayLabel(categories, exercise.category)}</span>
+                         <span className="rounded-full bg-slate-800 px-2.5 py-1 text-slate-300">{displayLabel(categories, exercise.category)}</span>
+                         <span className="rounded-full bg-violet-400/10 px-2.5 py-1 text-violet-300">{exercise.mode === "bodyweight" ? "Peso corporal" : "Con peso"}</span>
                       </div>
                     </div>
                     <div className="flex shrink-0 gap-2">

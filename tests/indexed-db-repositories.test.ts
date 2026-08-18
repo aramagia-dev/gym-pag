@@ -31,6 +31,7 @@ describe("Dexie persistence repositories", () => {
       name: "Bench press",
       muscleGroup: "chest",
       category: "push",
+      mode: "weighted",
     };
 
     await repository.create(exercise);
@@ -57,6 +58,7 @@ describe("Dexie persistence repositories", () => {
           order: 1,
           targetSets: 3,
           targetReps: 8,
+          sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }],
         },
       ],
     };
@@ -97,7 +99,7 @@ describe("Dexie persistence repositories", () => {
     await expect(repository.findById(legacyRoutine.id)).resolves.toEqual({
       id: legacyRoutine.id,
       name: legacyRoutine.name,
-      exercises: legacyRoutine.exercises,
+      exercises: [],
       daysOfWeek: ["thursday"],
     });
   });
