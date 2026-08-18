@@ -13,8 +13,9 @@ import { normalizeInviteCode, validateGroupName, validateInviteCode } from "@/sr
 import { copyInviteCode } from "@/src/features/groups/invite-clipboard";
 
 function errorMessage(reason: unknown): string {
-  const error = reason as { code?: string; message?: string };
+  const error = reason as { code?: string; message?: string; operation?: string };
   if (error.message?.toLowerCase().includes("invalid or expired")) return "El código no es válido, venció o ya no tiene usos disponibles.";
+  if (error.code === "P0001" && error.operation === "invite") return "Solo el administrador del grupo puede generar códigos de invitación.";
   if (error.code === "23505") return "Ya compartiste esa rutina con ese grupo.";
   if (error.code === "23514") return "La rutina compartida no cumple las validaciones de Supabase. Verifique que la migración 008 esté aplicada correctamente.";
   if (error.code === "42501") return "Supabase rechazó la operación por permisos. Verifique las políticas RLS.";
