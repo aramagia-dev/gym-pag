@@ -1,4 +1,10 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is a [Next.js](https://nextjs.org) local-first gym app with optional Supabase authentication.
+
+## Supabase groups setup
+
+The `/groups` route requires an authenticated Supabase user. Run `supabase/migrations/202608170001_multiuser_groups.sql`, then `supabase/migrations/202608170002_repair_group_creation.sql`, `supabase/migrations/202608170003_fix_group_creation_ambiguity.sql`, `supabase/migrations/202608170004_fix_invite_creation_timing.sql`, `supabase/migrations/202608170005_fix_invite_crypto_schema.sql`, `supabase/migrations/202608170006_fix_join_invite_ambiguity.sql`, `supabase/migrations/202608170007_fix_join_rpc_return_shape.sql`, and finally `supabase/migrations/202608170008_group_routine_shares.sql` in that order in the Supabase SQL Editor. If Supabase is not configured or the migrations have not been applied, the local app and its anonymous routes remain available.
+
+Shared routines are private read-only snapshots visible only to members of the selected group. Publishing copies routine metadata, ordered exercises, and prescribed sets into `group_routine_shares`; it never shares workout sessions, history, analytics, bodyweight, volume, or starting weights, and never changes the local Dexie routine. A publisher can revoke each share. The same local routine can be shared with multiple groups independently.
 
 ## Getting Started
 

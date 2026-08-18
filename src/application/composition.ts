@@ -13,6 +13,8 @@ import { HomeDashboardService } from "@/src/application/home/home-dashboard-serv
 import { seedDefaultExercises } from "@/src/infrastructure/persistence/indexed-db/exercise-catalog-seeder";
 import { SeededExerciseRepository } from "@/src/infrastructure/persistence/indexed-db/seeded-exercise-repository";
 import { database } from "@/src/infrastructure/persistence/indexed-db/database";
+import { SharedRoutineService } from "@/src/application/shared-routines/shared-routine-service";
+import type { SharedRoutineRepository } from "@/src/domain/repositories/shared-routine-repository";
 
 const exerciseRepository = new SeededExerciseRepository(
   new ExerciseDexieRepository(database),
@@ -56,3 +58,7 @@ export const homeDashboardService = new HomeDashboardService(
 );
 
 export const dataBackupService = new DataBackupService(new BackupDexieRepository());
+
+export function createSharedRoutineService(repository: SharedRoutineRepository): SharedRoutineService {
+  return new SharedRoutineService(routineRepository, exerciseRepository, repository);
+}

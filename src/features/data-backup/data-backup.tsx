@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { dataBackupService } from "@/src/application/composition";
+import AuthStatus from "@/src/features/auth/auth-status";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Ocurrió un problema. Intente nuevamente.";
@@ -55,6 +56,7 @@ export default function DataBackup() {
             <a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/history">Historial</a>
             <a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/analytics">Progreso</a>
             <a className="min-h-11 rounded-lg bg-cyan-400 px-3 py-2.5 font-semibold text-slate-950" href="/data">Datos</a>
+            <AuthStatus />
           </nav>
         </header>
         <div className="grid gap-6 md:grid-cols-2">

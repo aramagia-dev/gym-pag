@@ -72,6 +72,9 @@ export interface TemplateExercise {
 
 export interface TemplateSet {
   reps: number;
+  setType?: SetType;
+  notes?: string;
+  restSeconds?: number;
 }
 
 export interface RoutineTemplate {
@@ -92,7 +95,12 @@ export function normalizeRoutineTemplate(
   const normalizedExercises = routine.exercises.map((exercise) => ({
     ...exercise,
     sets: exercise.sets?.length
-      ? exercise.sets.map((set) => ({ reps: set.reps }))
+      ? exercise.sets.map((set) => ({
+        reps: set.reps,
+        ...(set.setType ? { setType: set.setType } : {}),
+        ...(set.notes ? { notes: set.notes } : {}),
+        ...(set.restSeconds === undefined ? {} : { restSeconds: set.restSeconds }),
+      }))
       : Array.from({ length: exercise.targetSets }, () => ({ reps: exercise.targetReps })),
   }));
   if ("daysOfWeek" in routine) return { ...routine, exercises: normalizedExercises };

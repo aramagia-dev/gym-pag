@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import AuthStatus from "@/src/features/auth/auth-status";
 import {
   workoutAnalyticsService,
   workoutHistoryService,
@@ -139,6 +140,7 @@ export default function WorkoutHistory() {
             >
               Datos
             </a>
+            <AuthStatus />
           </nav>
         </header>
         {loading && (

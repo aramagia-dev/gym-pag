@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import AuthStatus from "@/src/features/auth/auth-status";
 import {
   Bar,
   BarChart,
@@ -97,6 +98,7 @@ export default function ProgressAnalytics() {
             >
               Datos
             </a>
+            <AuthStatus />
           </nav>
         </header>
         {loading && (

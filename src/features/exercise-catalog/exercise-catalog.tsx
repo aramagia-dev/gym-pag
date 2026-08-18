@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import AuthStatus from "@/src/features/auth/auth-status";
 
 import { exerciseCatalogService } from "@/src/application/composition";
 import type {
@@ -201,7 +202,7 @@ export default function ExerciseCatalog() {
             <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Catálogo de ejercicios</h1>
             <p className="mt-2 max-w-xl text-sm text-slate-400">Construya una biblioteca clara de movimientos para cada sesión.</p>
           </div>
-           <nav className="flex flex-wrap gap-2 text-sm"><Link className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/">Inicio</Link><a className="min-h-11 rounded-lg bg-cyan-400 px-3 py-2.5 font-semibold text-slate-950" href="/exercises">Ejercicios</a><a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/routines">Rutinas</a><a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/history">Historial</a><a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/analytics">Progreso</a><a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/data">Datos</a></nav>
+            <nav className="flex flex-wrap gap-2 text-sm"><Link className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/">Inicio</Link><a className="min-h-11 rounded-lg bg-cyan-400 px-3 py-2.5 font-semibold text-slate-950" href="/exercises">Ejercicios</a><a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/routines">Rutinas</a><a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/history">Historial</a><a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/analytics">Progreso</a><a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/data">Datos</a><AuthStatus /></nav>
         </header>
 
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">

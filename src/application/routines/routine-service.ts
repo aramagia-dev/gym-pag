@@ -120,7 +120,12 @@ export class RoutineService {
 
     const exercises: TemplateExercise[] = input.exercises.map((selectedExercise, order) => {
       const sets = selectedExercise.sets?.length
-        ? selectedExercise.sets.map((set) => ({ reps: set.reps }))
+        ? selectedExercise.sets.map((set) => ({
+          reps: set.reps,
+          ...(set.setType ? { setType: set.setType } : {}),
+          ...(set.notes ? { notes: set.notes } : {}),
+          ...(set.restSeconds === undefined ? {} : { restSeconds: set.restSeconds }),
+        }))
         : Array.from({ length: selectedExercise.targetSets! }, () => ({ reps: selectedExercise.targetReps! }));
       return {
       id: this.templateExerciseIdGenerator(),

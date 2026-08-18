@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AuthStatus from "@/src/features/auth/auth-status";
 
 export default function RoutineNavigation({ active }: { active: "home" | "routines" | "new" | "edit" }) {
   return (
@@ -10,6 +11,7 @@ export default function RoutineNavigation({ active }: { active: "home" | "routin
       <a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/history">Historial</a>
       <a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/analytics">Progreso</a>
       <a className="min-h-11 rounded-lg border border-slate-700 px-3 py-2.5 text-slate-300 hover:border-cyan-400" href="/data">Datos</a>
+      <AuthStatus />
     </nav>
   );
 }
